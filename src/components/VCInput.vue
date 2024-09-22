@@ -59,8 +59,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['update:modelValue', 'update:error']);
-
+const emit = defineEmits(['update:modelValue', 'update:error', 'validated', 'unvalidated']);
 
 const forceUppercase = ref(props.forceuppercase);
 const allowedCharacters = ref(props.allowedcharacters);
@@ -152,7 +151,13 @@ watch(() => props.originalpassword, (newValue) => {
     if (input.value === "") {
         return;
     }
-    validateChange();
+    const validated = validateChange();
+
+    console.log('validated', validated);
+
+    if (validated) {
+        handleConfirmationValidated();
+    }
 });
 
 
@@ -168,6 +173,7 @@ function setError(message) {
         error.value = message;
         clearTimeout(errorTimeout.value);
         emit('update:error', message);
+        emit('update:modelValue', '');
     }
 }
 
@@ -566,14 +572,15 @@ function handleInput(e) {
 }
 
 function validateChange() {
-
     if (props.validation) {
         let validation = props.validation(input.value);
         console.log(validation);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            emit('unvalidated');
+            return false;
         }
+        emit('validated');
     }
 
 
@@ -581,7 +588,7 @@ function validateChange() {
         let validation = DNIValidation(input.value);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            return false;
         }
     }
 
@@ -589,7 +596,7 @@ function validateChange() {
         let validation = NIEValidation(input.value);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            return false;
         }
     }
 
@@ -597,7 +604,7 @@ function validateChange() {
         let validation = DNINIEValidation(input.value);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            return false;
         }
     }
 
@@ -605,7 +612,7 @@ function validateChange() {
         let validation = IBANValidation(input.value);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            return false;
         }
     }
 
@@ -613,7 +620,7 @@ function validateChange() {
         let validation = EMAILValidation(input.value);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            return false;
         }
     }
 
@@ -621,17 +628,31 @@ function validateChange() {
         let validation = PASSWORDValidation(input.value);
         if (!validation.ok) {
             setError(validation.error);
-            return;
+            return false;
         }
     }
 
     if (input.value.length < minlength.value) {
         console.log('error');
         setError(`El tamaño mínimo es de ${minlength.value}`);
-        return;
+        return false;
+    }
+
+
+    if (type.value !== 'PASSWORDCONFIRM') {
+        emit('update:modelValue', input.value);
     }
 
     stopError();
+    return true;
+}
+
+function handleValidation() {
+    emit('update:modelValue', input.value);
+}
+
+function handleUnvalidation() {
+    emit('update:modelValue', '');
 }
 
 function handleChange(e) {
@@ -649,6 +670,11 @@ function handleKeyDown(e) {
 }
 
 function passwordConfirmValidation(value) {
+
+    if (value === '') {
+        return { ok: true };
+    }
+
     if (value !== input.value) {
         return { ok: false, error: 'Las contraseñas no coinciden' };
     }
@@ -731,7 +757,18 @@ function passwordConfirmValidation(value) {
                 </div>
             </div>
         </div>
-        <VCInput v-if="type === 'PASSWORDCONFIRM'" class="mt-2" :placeholder="placeholder2" type="password" v-model="inputPasswordConfirm" :validation="passwordConfirmValidation" :error="passwordConfirmError" :originalpassword="input" />
+        <VCInput
+            v-if="type === 'PASSWORDCONFIRM'"
+            class="mt-2"
+            :placeholder="placeholder2"
+            type="password"
+            v-model="inputPasswordConfirm"
+            :validation="passwordConfirmValidation"
+            :error="passwordConfirmError"
+            :originalpassword="input"
+            @validated="handleValidation"
+            @unvalidated="handleUnvalidation"
+        />
     </div>
 
 </template>

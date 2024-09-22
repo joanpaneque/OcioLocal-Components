@@ -10,9 +10,10 @@ const input = ref(null);
 </script>
 
 <template>
-  <div class="h-screen bg-teal-300 flex flex-col p-10 gap-5">
-    <h1 class="text-teal-900 font-bold text-3xl text-center">Vue Components collection</h1>
+  <div class="bg-teal-300 flex flex-col p-10 gap-5">
     {{ input }}
+
+    <h1 class="text-teal-900 font-bold text-3xl text-center">Vue Components collection</h1>
     <ComponentShowcase title="VCInput confirmar contraseña">
       <VCInput :error="error" v-model="input" placeholder="Contraseña" placeholder2="Confirmar contraseña" type="passwordconfirm" />
     </ComponentShowcase>
