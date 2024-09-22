@@ -95,6 +95,11 @@ if (type.value === 'PASSWORD' || type.value === 'PASSWORDCONFIRM') {
     maxlength.value = 30;
 }
 
+if (type.value === 'TELF') {
+    forceUppercase.value = false;
+    allowedCharacters.value = '0123456789';
+}
+
 
 const incomingErrorFromParent = ref(false);
 
@@ -156,7 +161,7 @@ watch(() => props.originalpassword, (newValue) => {
     console.log('validated', validated);
 
     if (validated) {
-        handleConfirmationValidated();
+        handleValidation();        
     }
 });
 

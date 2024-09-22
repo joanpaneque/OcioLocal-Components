@@ -14,6 +14,9 @@ const input = ref(null);
     {{ input }}
 
     <h1 class="text-teal-900 font-bold text-3xl text-center">Vue Components collection</h1>
+    <ComponentShowcase title="VCInput teléfono">
+      <VCInput :error="error" v-model="input" placeholder="Teléfono" type="telf" />
+    </ComponentShowcase>
     <ComponentShowcase title="VCInput confirmar contraseña">
       <VCInput :error="error" v-model="input" placeholder="Contraseña" placeholder2="Confirmar contraseña" type="passwordconfirm" />
     </ComponentShowcase>
