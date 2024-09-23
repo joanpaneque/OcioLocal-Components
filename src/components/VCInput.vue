@@ -56,6 +56,11 @@ const props = defineProps({
         type: String,
         required: false,
         default: ''
+    },
+    revalidate: {
+        type: Boolean,
+        required: false,
+        default: false
     }
 });
 
@@ -93,11 +98,6 @@ if (type.value === 'PASSWORD' || type.value === 'PASSWORDCONFIRM') {
     allowedCharacters.value = null;
     minlength.value = 8;
     maxlength.value = 30;
-}
-
-if (type.value === 'TELF') {
-    forceUppercase.value = false;
-    allowedCharacters.value = '0123456789';
 }
 
 
@@ -577,6 +577,14 @@ function handleInput(e) {
 }
 
 function validateChange() {
+
+    if (input.value === '') {
+        stopError();
+        emit('update:modelValue', '');
+        return true;
+    }
+
+
     if (props.validation) {
         let validation = props.validation(input.value);
         console.log(validation);
@@ -585,7 +593,7 @@ function validateChange() {
             emit('unvalidated');
             return false;
         }
-        emit('validated');
+        emit('validated', input.value);
     }
 
 
@@ -663,6 +671,12 @@ function handleUnvalidation() {
 function handleChange(e) {
     validateChange();
 }
+
+watch(() => props.revalidate, (newValue) => {
+    if (newValue) {
+        validateChange();
+    }
+});
 
 function handleKeyDown(e) {
     if ((e.key === 'Backspace' || e.key === 'Delete') && (input.value ? input.value.length === 0 : true)) {
