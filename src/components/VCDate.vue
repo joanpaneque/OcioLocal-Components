@@ -11,6 +11,16 @@ const props = defineProps({
         type: String,
         required: true,
         default: ''
+    },
+    type: {
+        type: String,
+        required: false,
+        default: 'date'
+    },
+    max: {
+        type: String,
+        required: false,
+        default: '1960-01-06'
     }
 });
 
@@ -21,13 +31,29 @@ const selected = ref(props.modelValue);
 const open = ref(false);
 const everOpened = ref(false);
 
+const currentWindow = ref(props.type === 'birthday' ? 'multiyear' : 'month');
+
 
 // current year if modelValue is empty, if not, the year of the modelValue
-const selectedYear = ref(props.modelValue ? new Date(props.modelValue).getFullYear() : new Date().getFullYear());
-const selectedMonth = ref(props.modelValue ? new Date(props.modelValue).getMonth() : new Date().getMonth());
-const selectedDecade = ref(props.modelValue ? parseInt(new Date(props.modelValue).getFullYear()/10) : parseInt(new Date().getFullYear()/10));
 
-//const selectedDay = ref(props.modelValue ? new Date(props.modelValue).getDate() : new Date().getDate());
+
+const selectedYear = ref(props.modelValue ? new Date(props.modelValue).getFullYear() : null);
+const selectedMonth = ref(props.modelValue ? new Date(props.modelValue).getMonth() : null);
+const selectedDay = ref(props.modelValue ? new Date(props.modelValue).getDate() : null);
+
+
+const calendarYear = ref(null);
+const calendarMonth = ref(null);
+const calendarDecade = ref(null);
+
+resetCalendar();
+
+function resetCalendar() {
+    calendarYear.value = selectedYear.value ?? (props.max ? new Date(props.max).getFullYear() : new Date().getFullYear());
+    calendarMonth.value = selectedMonth.value ?? (props.max ? new Date(props.max).getMonth() : new Date().getMonth());
+    calendarDecade.value = parseInt((selectedYear.value ?? (props.max ? new Date(props.max).getFullYear() : new Date().getFullYear()))/10);
+}
+
 
 const months = [
     'enero',
@@ -53,9 +79,9 @@ const VCDateContainer = ref(null);
 const unfoldedPosition = ref('bl'); // bl, br, tl, tr
 
 const handleToggle = () => {
-    console.log("TOGGLE");
     open.value = !open.value;
     everOpened.value = true;
+    resetCalendar();
 
     if (!open.value) {
         return;
@@ -122,11 +148,6 @@ const handleClickOutside = (event) => {
     }
 };
 
-function handleSelect(key) {
-    selected.value = key;
-    emit('update:modelValue', key);
-    open.value = false;
-}
 
 // Agregar y eliminar event listener en el ciclo de vida de Vue
 onMounted(() => {
@@ -188,29 +209,29 @@ function nextYear(year, month) {
 }
 
 function updateNextMonth() {
-    if (selectedMonth.value === 11) {
-        selectedMonth.value = 0;
-        selectedYear.value++;
+    if (calendarMonth.value === 11) {
+        calendarMonth.value = 0;
+        calendarYear.value++;
     } else {
-        selectedMonth.value++;
+        calendarMonth.value++;
     }
 }
 
 function updatePreviousMonth() {
-    if (selectedMonth.value === 0) {
-        selectedMonth.value = 11;
-        selectedYear.value--;
+    if (calendarMonth.value === 0) {
+        calendarMonth.value = 11;
+        calendarYear.value--;
     } else {
-        selectedMonth.value--;
+        calendarMonth.value--;
     }
 }
 
 function updateNextDecade() {
-    selectedDecade.value++;
+    calendarDecade.value++;
 }
 
 function updatePreviousDecade() {
-    selectedDecade.value--;
+    calendarDecade.value--;
 }
 
 const nextMonthTransitionTimeout = ref(null);
@@ -271,18 +292,26 @@ const transitioningToPreviousDecade = ref(false);
 
 function displayMonthYear() {
     if (transitioningToNextMonth.value) {
-        return months[nextMonth(selectedMonth.value)] + ' ' + nextYear(selectedYear.value);
+        return months[nextMonth(calendarMonth.value)] + ' ' + nextYear(calendarYear.value);
     } else if (transitioningToPreviousMonth.value) {
-        return months[previousMonth(selectedMonth.value)] + ' ' + previousYear(selectedYear.value);
+        return months[previousMonth(calendarMonth.value)] + ' ' + previousYear(calendarYear.value);
     } else {
-        return months[selectedMonth.value] + ' ' + selectedYear.value;
+        return months[calendarMonth.value] + ' ' + calendarYear.value;
     }
 }
 
-
-const currentWindow = ref("month");
+function displayDecade() {
+    if (transitioningToNextDecade.value) {
+        return (calendarDecade.value + 1) * 10 + ' - ' + ((calendarDecade.value + 2) * 10 - 1);
+    } else if (transitioningToPreviousDecade.value) {
+        return (calendarDecade.value - 1) * 10 + ' - ' + (calendarDecade.value * 10 - 1);
+    } else {
+        return calendarDecade.value * 10 + ' - ' + ((calendarDecade.value + 1) * 10 - 1);
+    }
+}
 
 function handleHeaderClick() {
+    resetCalendar();
     if (currentWindow.value === "month") {
         currentWindow.value = "year";
     } else if (currentWindow.value === "year") {
@@ -305,6 +334,77 @@ function handlePreviousArrow() {
         handlePreviousMonth();
     } else if (currentWindow.value === "multiyear") {
         handlePreviousDecade();
+    }
+}
+
+function handleDayClick(day) {
+    console.log(day);
+    selectedYear.value = calendarYear.value;
+    selectedMonth.value = calendarMonth.value;
+    selectedDay.value = day + 1;
+    if (selectedYear.value !== null && selectedMonth.value !== null && selectedDay.value !== null) {
+        selected.value = new Date(selectedYear.value, selectedMonth.value, selectedDay.value).toISOString().slice(0, 10);
+        emit('update:modelValue', selected.value);
+    }
+}
+
+function isOutOfThisMonth(index, year, month) {
+    return getRealDateIndex(index, year, month) <= 0 || getRealDateIndex(index, year, month) > daysInMonth(year, month);
+}
+
+function isSelectedDay(index, year, month) {
+    return getRealDateIndex(index, year, month) === selectedDay.value - 1 && year === selectedYear.value && month === selectedMonth.value;
+}
+
+function isToday(index, year, month) {
+    return getRealDateIndex(index, year, month) === new Date().getDate() && year === new Date().getFullYear() && month === new Date().getMonth();
+}
+
+function convertDate(date) {
+    return date.split('-').reverse().join('/');
+}
+
+function handleMonthClick(month) {
+    selectedMonth.value = month;
+    calendarMonth.value = month - 1;
+    currentWindow.value = "month";
+    if (selectedYear.value !== null && selectedMonth.value !== null && selectedDay.value !== null) {
+        selected.value = new Date(selectedYear.value, selectedMonth.value, selectedDay.value).toISOString().slice(0, 10);
+        emit('update:modelValue', selected.value);
+    }
+}
+
+function handleYearClick(year) {
+    selectedYear.value = year;
+    calendarYear.value = year;
+    currentWindow.value = "year";
+    if (selectedYear.value !== null && selectedMonth.value !== null && selectedDay.value !== null) {
+        selected.value = new Date(selectedYear.value, selectedMonth.value, selectedDay.value).toISOString().slice(0, 10);
+        emit('update:modelValue', selected.value);
+    }
+}
+
+function maxYear() {
+    if (props.max) {
+        return new Date(props.max).getFullYear();
+    } else {
+        return null;
+    }
+}
+
+function maxMonth() {
+    if (props.max) {
+        return new Date(props.max).getMonth();
+    } else {
+        return null;
+    }
+}
+
+function maxDay() {
+    if (props.max) {
+        return new Date(props.max).getDate();
+    } else {
+        return null;
     }
 }
 
@@ -331,8 +431,8 @@ function handlePreviousArrow() {
                     <div
                         class="absolute left-[10px] top-[50%] transform -translate-y-1/2 flex items-center gap-2 pr-5 w-full">
                         <span class="text-ellipsis overflow-hidden whitespace-nowrap pr-5"
-                            v-if="selectedHour || selectedMinute">
-                            {{ selectedHour ?? '--' }}:{{ selectedMinute ?? '--' }}
+                            v-if="selected">
+                            {{ convertDate(selected) }}
                         </span>
                     </div>
                     <div class="absolute right-[10px] top-[50%] transform -translate-y-1/2">
@@ -364,8 +464,8 @@ function handlePreviousArrow() {
                         <span
                             class="text-gray-400 px-[10px] w-full hover:bg-slate-100 rounded-[10px] h-full flex items-center justify-start"
                             @click="handleHeaderClick">
-                            {{ currentWindow === 'month' ? displayMonthYear() : currentWindow === 'year' ? selectedYear
-                                : selectedYear - 10 + ' - ' + (selectedYear + 9) }}
+                            {{ currentWindow === 'month' ? displayMonthYear() : currentWindow === 'year' ? calendarYear
+                                : displayDecade() }}
                         </span>
                         <div class="flex gap-1 h-full" v-if="currentWindow === 'month' || currentWindow === 'multiyear'">
                             <span
@@ -379,9 +479,15 @@ function handlePreviousArrow() {
                                 </svg>
                             </span>
                             <span
-                                class="text-gray-400 h-full flex justify-center items-center w-8 hover:bg-slate-100 rounded-[10px]"
+                                class="h-full text-gray-400 flex justify-center items-center w-8 hover:bg-slate-100 rounded-[10px]"
+                                :class="{
+                                    'text-gray-200 pointer-events-none':
+                                        (currentWindow === 'multiyear' && maxYear() && calendarDecade * 10 + 10 > maxYear()) ||
+                                        (currentWindow === 'month' && maxYear() && calendarYear === maxYear() && maxMonth() === calendarMonth)
+                                }"
                                 @click="handleNextArrow">
-                                <svg class="h-5 w-5 text-gray-400 transition-all duration-200" fill="none"
+                                <svg
+                                    class="h-5 w-5 transition-all duration-200" fill="none"
                                     stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M19 9l-7 7-7-7">
@@ -411,9 +517,14 @@ function handlePreviousArrow() {
                                     'transition-to-previous-month-as-previous-month': transitioningToPreviousMonth,
                                     'top-[-100%]': !transitioningToPreviousMonth,
                                 }" class="grid grid-rows-6 grid-cols-7 w-full h-full absolute">
-                                    <span v-for="(day, index) in 42" class="flex items-center justify-center">
-                                        {{ getCalendarDay(index, previousYear(selectedYear, selectedMonth),
-                                            previousMonth(selectedMonth)) }}
+                                    <span v-for="(day, index) in 42"
+                                        :class="{
+                                            'text-gray-400': isOutOfThisMonth(index, previousYear(calendarYear, calendarMonth), previousMonth(calendarMonth)),
+                                            'bg-slate-300 hover:bg-slate-300 text-black': isSelectedDay(index, previousYear(calendarYear, calendarMonth), previousMonth(calendarMonth)),
+                                        }"
+                                        class="flex items-center justify-center">
+                                        {{ getCalendarDay(index, previousYear(calendarYear, calendarMonth),
+                                            previousMonth(calendarMonth)) }}
                                     </span>
                                 </div>
                                 <div :class="{
@@ -422,20 +533,29 @@ function handlePreviousArrow() {
                                     'top-0': !transitioningToPreviousMonth || !transitioningToNextMonth,
                                 }" class="grid grid-rows-6 grid-cols-7 w-full h-full absolute">
                                     <span v-for="(day, index) in 42"
+                                        @click="handleDayClick(getRealDateIndex(index, calendarYear, calendarMonth))"
                                         class="flex items-center justify-center hover:bg-slate-100 rounded-[50%]"
                                         :class="{
-                                            'text-gray-400': getRealDateIndex(index, selectedYear, selectedMonth) <= 0 || getRealDateIndex(index, selectedYear, selectedMonth) > daysInMonth(selectedYear, selectedMonth),
+                                            'pointer-events-none text-gray-200': maxYear() && calendarYear === maxYear() && calendarMonth === maxMonth() && getRealDateIndex(index, calendarYear, calendarMonth) > maxDay(),
+                                            'text-gray-400': isOutOfThisMonth(index, calendarYear, calendarMonth),
+                                            'bg-slate-300 hover:bg-slate-300 text-black': isSelectedDay(index, calendarYear, calendarMonth),
+                                            'font-bold': isToday(index, calendarYear, calendarMonth),
                                         }">
-                                        {{ getCalendarDay(index, selectedYear, selectedMonth) }}
+                                        {{ getCalendarDay(index, calendarYear, calendarMonth) }}
                                     </span>
                                 </div>
                                 <div :class="{
                                     'transition-to-next-month-as-next-month': transitioningToNextMonth,
                                     'top-[100%]': !transitioningToNextMonth,
                                 }" class="grid grid-rows-6 grid-cols-7 w-full h-full absolute">
-                                    <span v-for="(day, index) in 42" class="flex items-center justify-center">
-                                        {{ getCalendarDay(index, nextYear(selectedYear, selectedMonth),
-                                            nextMonth(selectedMonth)) }}
+                                    <span v-for="(day, index) in 42"
+                                        :class="{
+                                            'text-gray-400': isOutOfThisMonth(index, nextYear(calendarYear, calendarMonth), nextMonth(calendarMonth)),
+                                            'bg-slate-300 hover:bg-slate-300 text-black': isSelectedDay(index, nextYear(calendarYear, calendarMonth), previousMonth(calendarMonth)),
+                                        }"
+                                        class="flex items-center justify-center rounded-[10px]">
+                                        {{ getCalendarDay(index, nextYear(calendarYear, calendarMonth),
+                                            nextMonth(calendarMonth)) }}
                                     </span>
                                 </div>
                             </div>
@@ -447,7 +567,14 @@ function handlePreviousArrow() {
                                 'hidden': currentWindow === 'month'
                             }"
                             class="absolute top-0 w-full h-full grid grid-cols-3 grid-rows-4 gap-1">
-                            <div v-for="month in 12" class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
+                            <div v-for="(month) in 12"
+                                @click="handleMonthClick(month)"
+                                :class="{
+                                    'font-bold': month === new Date().getMonth()+1 && calendarYear === new Date().getFullYear(),
+                                    'bg-slate-300 hover:bg-slate-300 text-black': selectedMonth === month,
+                                    'text-gray-300 pointer-events-none': maxYear() && calendarYear === maxYear() && month - 1 > maxMonth(),
+                                }"
+                                class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
                                 {{ months[month - 1].slice(0, 3) }}.
                             </div>
                         </div>
@@ -465,7 +592,7 @@ function handlePreviousArrow() {
                                     }"
                                     class="absolute w-full h-full grid grid-cols-2 grid-rows-5">
                                     <span v-for="(year, index) in 10" class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
-                                        {{ (selectedDecade - 1) * 10 + index }}
+                                        {{ (calendarDecade - 1) * 10 + index }}
                                     </span>
                                 </div>
                                 <div
@@ -475,8 +602,15 @@ function handlePreviousArrow() {
                                         'top-0': !transitioningToPreviousDecade || !transitioningToNextDecade,
                                     }"
                                     class="absolute w-full h-full grid grid-cols-2 grid-rows-5">
-                                    <span v-for="(year, index) in 10" class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
-                                        {{ selectedDecade * 10 + index }}
+                                    <span v-for="(year, index) in 10"
+                                    @click="handleYearClick((calendarDecade * 10) + index)"
+                                    :class="{
+                                        'font-bold': new Date().getFullYear() === calendarDecade * 10 + index,
+                                        'bg-slate-300 hover:bg-slate-300 text-black': selectedYear === calendarDecade * 10 + index,
+                                        'text-gray-300 pointer-events-none': maxYear() && (calendarDecade * 10 + index) > maxYear(),
+                                    }"
+                                    class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
+                                        {{ calendarDecade * 10 + index }}
                                     </span>
                                 </div>
                                 <div
@@ -485,8 +619,9 @@ function handlePreviousArrow() {
                                         'top-[100%]': !transitioningToNextDecade,
                                     }"
                                     class="absolute w-full h-full grid grid-cols-2 grid-rows-5">
-                                    <span v-for="(year, index) in 10" class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
-                                        {{ (selectedDecade + 1) * 10 + index }}
+                                    <span v-for="(year, index) in 10"
+                                    class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
+                                        {{ (calendarDecade + 1) * 10 + index }}
                                     </span>
                                 </div>
                             </div>
