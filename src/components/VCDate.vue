@@ -20,7 +20,12 @@ const props = defineProps({
     max: {
         type: String,
         required: false,
-        default: '1960-01-06'
+        default: '2022-05-13'
+    },
+    min: {
+        type: String,
+        required: false,
+        default: '2021-12-20'
     }
 });
 
@@ -49,10 +54,51 @@ const calendarDecade = ref(null);
 resetCalendar();
 
 function resetCalendar() {
-    calendarYear.value = selectedYear.value ?? (props.max ? new Date(props.max).getFullYear() : new Date().getFullYear());
-    calendarMonth.value = selectedMonth.value ?? (props.max ? new Date(props.max).getMonth() : new Date().getMonth());
-    calendarDecade.value = parseInt((selectedYear.value ?? (props.max ? new Date(props.max).getFullYear() : new Date().getFullYear()))/10);
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+
+    const minDate = props.min ? new Date(props.min) : null;
+    const maxDate = props.max ? new Date(props.max) : null;
+    const minYear = minDate ? minDate.getFullYear() : null;
+    const maxYear = maxDate ? maxDate.getFullYear() : null;
+    const minMonth = minDate ? minDate.getMonth() : null;
+    const maxMonth = maxDate ? maxDate.getMonth() : null;
+
+    // Calcular el año del calendario
+    if (selectedYear.value != null) {
+        calendarYear.value = selectedYear.value;
+    } else if (maxYear != null && maxYear < currentYear) {
+        calendarYear.value = maxYear;
+    } else if (minYear != null && minYear > currentYear) {
+        calendarYear.value = minYear;
+    } else {
+        calendarYear.value = currentYear;
+    }
+
+    // Calcular el mes del calendario
+    if (selectedMonth.value != null) {
+        calendarMonth.value = selectedMonth.value;
+    } else if (calendarYear.value === maxYear && maxMonth != null && maxMonth < currentMonth) {
+        calendarMonth.value = maxMonth;
+    } else if (calendarYear.value === minYear && minMonth != null && minMonth > currentMonth) {
+        calendarMonth.value = minMonth;
+    } else {
+        calendarMonth.value = currentMonth;
+    }
+
+    // Calcular la década del calendario
+    if (selectedYear.value != null) {
+        calendarDecade.value = Math.floor(selectedYear.value / 10);
+    } else if (maxYear != null && Math.floor(maxYear / 10) < Math.floor(currentYear / 10)) {
+        calendarDecade.value = Math.floor(maxYear / 10);
+    } else if (minYear != null && Math.floor(minYear / 10) > Math.floor(currentYear / 10)) {
+        calendarDecade.value = Math.floor(minYear / 10);
+    } else {
+        calendarDecade.value = Math.floor(currentYear / 10);
+    }
 }
+
 
 
 const months = [
@@ -408,6 +454,30 @@ function maxDay() {
     }
 }
 
+function minYear() {
+    if (props.min) {
+        return new Date(props.min).getFullYear();
+    } else {
+        return null;
+    }
+}
+
+function minMonth() {
+    if (props.min) {
+        return new Date(props.min).getMonth();
+    } else {
+        return null;
+    }
+}
+
+function minDay() {
+    if (props.min) {
+        return new Date(props.min).getDate();
+    } else {
+        return null;
+    }
+}
+
 </script>
 
 <template>
@@ -469,9 +539,14 @@ function maxDay() {
                         </span>
                         <div class="flex gap-1 h-full" v-if="currentWindow === 'month' || currentWindow === 'multiyear'">
                             <span
-                                class="text-gray-400 rotate-180 h-full flex justify-center items-center w-8 hover:bg-slate-100 rounded-[10px]"
+                                class="rotate-180 h-full flex justify-center items-center w-8 hover:bg-slate-100 rounded-[10px]"
+                                :class="{
+                                    'text-gray-200 pointer-events-none':
+                                        (currentWindow === 'multiyear' && calendarDecade * 10 < minYear()) ||
+                                        (currentWindow === 'month' && minYear() && calendarYear === minYear() && minMonth() === calendarMonth)
+                                }"
                                 @click="handlePreviousArrow">
-                                <svg class="h-5 w-5 text-gray-400 transition-all duration-200" fill="none"
+                                <svg class="h-5 w-5 transition-all duration-200" fill="none"
                                     stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M19 9l-7 7-7-7">
@@ -479,12 +554,11 @@ function maxDay() {
                                 </svg>
                             </span>
                             <span
-                                class="h-full text-gray-400 flex justify-center items-center w-8 hover:bg-slate-100 rounded-[10px]"
+                                class="h-full flex justify-center items-center w-8 hover:bg-slate-100 rounded-[10px]"
                                 :class="{
                                     'text-gray-200 pointer-events-none':
                                         (currentWindow === 'multiyear' && maxYear() && calendarDecade * 10 + 10 > maxYear()) ||
-                                        (currentWindow === 'month' && maxYear() && calendarYear === maxYear() && maxMonth() === calendarMonth)
-                                }"
+                                        (currentWindow === 'month' && maxYear() && calendarYear === maxYear() && maxMonth() === calendarMonth)                                }"
                                 @click="handleNextArrow">
                                 <svg
                                     class="h-5 w-5 transition-all duration-200" fill="none"
@@ -536,10 +610,16 @@ function maxDay() {
                                         @click="handleDayClick(getRealDateIndex(index, calendarYear, calendarMonth))"
                                         class="flex items-center justify-center hover:bg-slate-100 rounded-[50%]"
                                         :class="{
-                                            'pointer-events-none text-gray-200': maxYear() && calendarYear === maxYear() && calendarMonth === maxMonth() && getRealDateIndex(index, calendarYear, calendarMonth) > maxDay(),
-                                            'text-gray-400': isOutOfThisMonth(index, calendarYear, calendarMonth),
+                                            'text-gray-400':
+                                                isOutOfThisMonth(index, calendarYear, calendarMonth) &&
+                                                !(maxYear() && calendarYear === maxYear() && calendarMonth === maxMonth() && getRealDateIndex(index, calendarYear, calendarMonth) > maxDay()) &&
+                                                !(minYear() && calendarYear === minYear() && calendarMonth === minMonth() && getRealDateIndex(index, calendarYear, calendarMonth) < minDay()),
                                             'bg-slate-300 hover:bg-slate-300 text-black': isSelectedDay(index, calendarYear, calendarMonth),
                                             'font-bold': isToday(index, calendarYear, calendarMonth),
+                                            'pointer-events-none text-gray-200':
+                                                maxYear() && calendarYear === maxYear() && calendarMonth === maxMonth() && getRealDateIndex(index, calendarYear, calendarMonth) > maxDay() ||
+                                                minYear() && calendarYear === minYear() && calendarMonth === minMonth() && getRealDateIndex(index, calendarYear, calendarMonth) < minDay()
+
                                         }">
                                         {{ getCalendarDay(index, calendarYear, calendarMonth) }}
                                     </span>
@@ -572,7 +652,9 @@ function maxDay() {
                                 :class="{
                                     'font-bold': month === new Date().getMonth()+1 && calendarYear === new Date().getFullYear(),
                                     'bg-slate-300 hover:bg-slate-300 text-black': selectedMonth === month,
-                                    'text-gray-300 pointer-events-none': maxYear() && calendarYear === maxYear() && month - 1 > maxMonth(),
+                                    'text-gray-300 pointer-events-none':
+                                    maxYear() && calendarYear === maxYear() && month - 1 > maxMonth() ||
+                                    minYear() && calendarYear === minYear() && month - 1 < minMonth()
                                 }"
                                 class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
                                 {{ months[month - 1].slice(0, 3) }}.
@@ -607,7 +689,7 @@ function maxDay() {
                                     :class="{
                                         'font-bold': new Date().getFullYear() === calendarDecade * 10 + index,
                                         'bg-slate-300 hover:bg-slate-300 text-black': selectedYear === calendarDecade * 10 + index,
-                                        'text-gray-300 pointer-events-none': maxYear() && (calendarDecade * 10 + index) > maxYear(),
+                                        'text-gray-300 pointer-events-none': maxYear() && (calendarDecade * 10 + index) > maxYear() || minYear() && (calendarDecade * 10 + index) < minYear()
                                     }"
                                     class="flex items-center justify-center hover:bg-slate-100 rounded-[10px]">
                                         {{ calendarDecade * 10 + index }}
